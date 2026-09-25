@@ -1,0 +1,19 @@
+{
+  "id": "./mobile.html",
+  "name": "Daylight Pocket",
+  "short_name": "Daylight",
+  "description": "Private offline planning and tasks on your phone.",
+  "start_url": "./mobile.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f2ec",
+  "theme_color": "#f3f2ec",
+  "icons": [
+    {
+      "src": "daylight-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

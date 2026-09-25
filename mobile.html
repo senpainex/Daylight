@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f2ec">
+  <meta name="description" content="A small private Daylight companion for planning and tasks on your phone.">
+  <title>Daylight Pocket</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="daylight-icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <div class="pocket-app">
+    <header class="pocket-header">
+      <a class="pocket-brand" href="index.html" aria-label="Daylight home"><span class="pocket-mark">d.</span><span>daylight</span></a>
+      <button id="install-button" class="install-button" type="button" hidden aria-label="Install Daylight on this phone" title="Install Daylight">＋</button>
+    </header>
+
+    <main>
+      <section class="pocket-top" aria-labelledby="pocket-title">
+        <div class="eyebrow"><span class="status-dot"></span> YOUR PRIVATE POCKET COMPANION</div>
+        <h1 id="pocket-title">A little room<br>to <em>breathe.</em></h1>
+        <p class="pocket-date" id="today"></p>
+      </section>
+
+      <nav class="pocket-tabs" aria-label="Pocket views">
+        <button class="tab-button active" type="button" data-view="chat-view" aria-selected="true">Assistant</button>
+        <button class="tab-button" type="button" data-view="tasks-view" aria-selected="false">Tasks <span id="task-count">0</span></button>
+      </nav>
+
+      <section class="pocket-view active" id="chat-view" aria-label="Offline assistant">
+        <div class="message-stream" id="messages" aria-live="polite" aria-relevant="additions">
+          <article class="assistant-message"><span class="message-mark">d.</span><p>What would make today feel a little easier?</p></article>
+          <div class="quick-prompts" aria-label="Quick suggestions">
+            <button type="button" data-prompt="plan">Help me plan</button>
+            <button type="button" data-prompt="tasks">Show my tasks</button>
+          </div>
+        </div>
+        <form class="composer" id="chat-form">
+          <label class="visually-hidden" for="message-input">Message Daylight</label>
+          <textarea id="message-input" rows="1" maxlength="1200" placeholder="Try “plan” or “task buy milk”" enterkeyhint="send"></textarea>
+          <button class="send-button" type="submit" aria-label="Send message">↑</button>
+        </form>
+        <p class="privacy-caption"><span>⌑</span> This phone only · Works offline</p>
+      </section>
+
+      <section class="pocket-view task-view" id="tasks-view" aria-label="Your tasks">
+        <div class="task-intro"><p class="eyebrow">ONE THING AT A TIME</p><h2>Your list.</h2></div>
+        <form id="task-form" class="task-composer">
+          <label class="visually-hidden" for="new-task">Add a task</label>
+          <input id="new-task" type="text" maxlength="180" placeholder="Add something to remember…">
+          <button type="submit" aria-label="Add task">+</button>
+        </form>
+        <ul id="task-list" class="task-list"></ul>
+        <p id="empty-tasks" class="empty-tasks">Nothing waiting here.</p>
+        <button id="clear-done" class="clear-done" type="button" hidden>Clear completed</button>
+      </section>
+    </main>
+
+    <footer class="pocket-footer">
+      <p>Your tasks stay in this browser on this phone.</p>
+      <a href="index.html">Desktop version <span>↗</span></a>
+    </footer>
+  </div>
+  <script src="mobile.js"></script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP="Daylight"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/daylight"
+TASKS_FILE="$DATA_DIR/tasks.txt"
+MODEL="${DAYLIGHT_MODEL:-llama3.2}"
+CLAUDE_MODEL="claude-fable-5-1"
+CLAUDE_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/daylight"
+CLAUDE_KEY_FILE="$CLAUDE_CONFIG/anthropic.key"
+mkdir -p "$DATA_DIR"
+
+show_message() {
+  zenity --info --title="$APP" --width=440 --no-wrap --text="$1" >/dev/null 2>&1 || true
+}
+
+get_claude_key() {
+  if command -v secret-tool >/dev/null 2>&1; then
+    secret-tool lookup service daylight provider anthropic 2>/dev/null || true
+  elif [[ -f "$CLAUDE_KEY_FILE" ]]; then
+    cat -- "$CLAUDE_KEY_FILE"
+  fi
+}
+
+configure_claude() {
+  local key
+  if ! key="$(zenity --password --title="$APP · Claude API setup" --text="Paste your Anthropic API key. It is stored locally and never added to Daylight's source files." 2>/dev/null)" || [[ -z "$key" ]]; then
+    return
+  fi
+  if [[ ! "$key" =~ ^[A-Za-z0-9_-]{20,}$ ]]; then
+    show_message "That key format doesn't look right. Create an API key in the Anthropic Console and try again."
+    unset key
+    return
+  fi
+  if command -v secret-tool >/dev/null 2>&1; then
+    if printf '%s' "$key" | secret-tool store --label="Daylight Anthropic API key" service daylight provider anthropic >/dev/null 2>&1; then
+      show_message "Claude API key saved in GNOME Keyring. API usage is billed separately from a Claude chat subscription."
+    else
+      show_message "GNOME Keyring could not save the key. No key was saved."
+    fi
+  else
+    install -d -m 700 "$CLAUDE_CONFIG"
+    (umask 077; printf '%s\n' "$key" > "$CLAUDE_KEY_FILE")
+    chmod 600 "$CLAUDE_KEY_FILE"
+    show_message "Claude API key saved locally with owner-only permissions. API usage is billed separately from a Claude chat subscription."
+  fi
+  unset key
+}
+
+ask_claude() {
+  local key="$1" prompt="$2" temp_dir http_code answer api_error
+  temp_dir="$(mktemp -d)"
+  chmod 700 "$temp_dir"
+  jq -n --arg model "$CLAUDE_MODEL" --arg prompt "$prompt" \
+    --arg system "You are Daylight, a concise and practical personal laptop assistant. Help with the user's request in a few clear sentences. Never claim to have performed actions. Never instruct the user to execute untrusted downloads." \
+    '{model:$model,max_tokens:700,system:$system,messages:[{role:"user",content:$prompt}]}' > "$temp_dir/request.json"
+  printf 'header = "x-api-key: %s"\n' "$key" > "$temp_dir/curl.conf"
+  chmod 600 "$temp_dir/curl.conf" "$temp_dir/request.json"
+  http_code="$(curl --silent --show-error --max-time 120 --config "$temp_dir/curl.conf" \
+    --header 'anthropic-version: 2023-06-01' --header 'content-type: application/json' \
+    --data-binary "@$temp_dir/request.json" --output "$temp_dir/response.json" \
+    --write-out '%{http_code}' https://api.anthropic.com/v1/messages 2>/dev/null || true)"
+  if [[ "$http_code" == 2?? ]]; then
+    answer="$(jq -r '[.content[]? | select(.type == "text") | .text] | join("\n")' "$temp_dir/response.json" 2>/dev/null || true)"
+    rm -rf -- "$temp_dir"
+    if [[ -n "$answer" ]]; then
+      show_message "$answer"
+    else
+      show_message "Claude returned no text. Try a shorter request."
+    fi
+  else
+    api_error="$(jq -r '.error.message // empty' "$temp_dir/response.json" 2>/dev/null || true)"
+    rm -rf -- "$temp_dir"
+    if [[ -n "$api_error" ]]; then
+      show_message "Claude API error ($http_code):\n$api_error"
+    else
+      show_message "Couldn't reach Claude (HTTP $http_code). Check your connection and API key."
+    fi
+  fi
+}
+
+if ! command -v zenity >/dev/null 2>&1; then
+  notify-send "$APP" "Install zenity to use the desktop prompt."
+  exit 1
+fi
+
+if ! request="$(zenity --entry --title="$APP" --width=520 --text="What can I help with? Try: plan · task buy milk · download a direct link" 2>/dev/null)"; then
+  exit 0
+fi
+request="${request#"${request%%[![:space:]]*}"}"
+request="${request%"${request##*[![:space:]]}"}"
+[[ -n "$request" ]] || exit 0
+
+if [[ "${request,,}" == "claude setup" ]]; then
+  configure_claude
+  exit 0
+fi
+
+if [[ "${request,,}" == "claude forget" ]]; then
+  if command -v secret-tool >/dev/null 2>&1; then
+    secret-tool clear service daylight provider anthropic >/dev/null 2>&1 || true
+  fi
+  rm -f -- "$CLAUDE_KEY_FILE"
+  show_message "Daylight's saved Claude API key was removed."
+  exit 0
+fi
+
+if [[ "$request" =~ ^(add[[:space:]]+)?task[[:space:]:,-]+(.+)$ ]]; then
+  task="${BASH_REMATCH[2]}"
+  printf '%s\n' "$task" >> "$TASKS_FILE"
+  show_message "Added to your local task list:\n\n$task"
+  exit 0
+fi
+
+if [[ "${request,,}" == "tasks" || "${request,,}" == "my tasks" ]]; then
+  if [[ -s "$TASKS_FILE" ]]; then
+    tasks="$(sed 's/^/•  /' "$TASKS_FILE")"
+    show_message "Your tasks:\n\n$tasks"
+  else
+    show_message "Your task list is empty. Try: task buy milk"
+  fi
+  exit 0
+fi
+
+if [[ "${request,,}" == "plan" || "${request,,}" == "plan my day" ]]; then
+  show_message "Choose one thing that would make today easier. Give it 20 minutes, then decide what comes next."
+  exit 0
+fi
+
+if [[ "$request" =~ ^download[[:space:]]+(https://[^[:space:]]+) ]]; then
+  url="${BASH_REMATCH[1]}"
+  while [[ "$url" == *[.,!?\)] ]]; do url="${url%?}"; done
+  if [[ ! "$url" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[^[:space:]]*)?$ ]]; then
+    show_message "That link doesn't look like a valid HTTPS URL."
+    exit 0
+  fi
+  url_path="${url%%[\?#]*}"
+  filename="${url_path##*/}"
+  filename="$(printf '%s' "$filename" | tr -cd '[:alnum:]_.-')"
+  [[ -n "$filename" && "$filename" != "." && "$filename" != ".." ]] || filename="download"
+  download_dir="$HOME/Downloads"
+  mkdir -p "$download_dir"
+  destination="$download_dir/$filename"
+  if [[ -e "$destination" ]] && ! zenity --question --title="$APP · Confirm replacement" --width=460 --text="$destination already exists. Replace it? The downloaded file will not be opened or run."; then
+    exit 0
+  fi
+  host="${url#*://}"
+  host="${host%%/*}"
+  if ! zenity --question --title="$APP · Confirm download" --width=460 --text="Save a file from $host to:\n$destination\n\nDaylight will not open or run it."; then
+    exit 0
+  fi
+  temporary="$download_dir/.daylight-download-$$"
+  if curl --fail --location --silent --show-error --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 1800 --max-filesize 524288000 --output "$temporary" "$url" 2>/dev/null && mv -f -- "$temporary" "$destination"; then
+    show_message "Saved to:\n$destination\n\nReview the file before opening it."
+  else
+    rm -f -- "$temporary"
+    show_message "The download failed or exceeded 500 MB. No file was kept."
+  fi
+  exit 0
+fi
+
+use_ollama=0
+if [[ "$request" =~ ^ollama[[:space:]]+(.+)$ ]]; then
+  request="${BASH_REMATCH[1]}"
+  use_ollama=1
+fi
+
+if (( ! use_ollama )); then
+  claude_key="$(get_claude_key)"
+  if [[ -n "$claude_key" ]]; then
+    if zenity --question --title="$APP · Claude" --width=480 --text="Send this request to Anthropic's Claude Fable 5.1 API?\n\nYour text leaves this laptop. API usage may incur charges separate from a Claude chat subscription. This confirmation is for this request only." --ok-label="Send to Claude" --cancel-label="Cancel"; then
+      ask_claude "$claude_key" "$request"
+    fi
+    unset claude_key
+    exit 0
+  fi
+fi
+
+if [[ "$request" =~ ^claude[[:space:]]+(.+)$ ]]; then
+  show_message "Set up Claude first by typing claude setup. An Anthropic API key is required, and API usage may be billed separately from a Claude subscription."
+  exit 0
+fi
+
+if ! command -v ollama >/dev/null 2>&1; then
+  show_message "For open-ended AI, type claude setup to connect Claude, or install Ollama and a local model.\n\nFor now, try: plan · task buy milk · tasks · download https://…"
+  exit 0
+fi
+
+if ! ollama list 2>/dev/null | awk 'NR > 1 { print $1 }' | grep -Fxq "$MODEL"; then
+  show_message "The local model '$MODEL' isn't installed yet. In a terminal, run:\n\nollama pull $MODEL\n\nOr type claude setup to connect Claude."
+  exit 0
+fi
+
+prompt="You are Daylight, a concise and practical private laptop assistant. Help with the user's request in a few clear sentences. Do not claim to have performed actions. Never ask the user to run downloaded software without checking it first.\n\nUser: $request"
+if reply="$(printf '%b' "$prompt" | ollama run "$MODEL" 2>/dev/null)" && [[ -n "$reply" ]]; then
+  show_message "$reply"
+else
+  show_message "Ollama couldn't answer. Check that it is running and the model '$MODEL' is available."
+fi
