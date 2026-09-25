@@ -42,6 +42,7 @@ async function initializeAuth() {
   if (!response.ok || !contentType.includes("application/json")) {
     throw new Error("Google and phone sign-in aren't configured yet. The site owner must connect a Firebase project. See setup instructions.");
   }
+    throw new Error("Google and phone sign-in aren't configured yet. The site owner should fill in firebase-config.json from Firebase Console.");
   let config;
   try {
     config = await response.json();

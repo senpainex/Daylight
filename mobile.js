@@ -169,20 +169,72 @@ function reply(text) {
     renderTasks();
     return `Completed: ${tasks[chosen].text}`;
   }
-  if (/^(?:plan|plan my day|help me plan)$/i.test(clean) || /\b(plan|overwhelmed|too much|prioriti[sz]e)\b/i.test(clean)) {
+  if (/^(?:plan|plan my day|help me plan|help me plan my day)$/i.test(clean)) {
     const open = tasks.filter((task) => !task.done).map((task) => task.text);
     return open.length
       ? `Pick one thing that would make today easier and give its next step 15 minutes. Your open tasks: ${open.slice(0, 5).join("; ")}`
       : "Choose one thing that would make today easier. Write down the next tiny step and give it 15 minutes.";
   }
   if (/^download\b/i.test(clean)) return "The phone companion doesn't download files yet. Use the desktop version for confirmed direct HTTPS downloads.";
-  return "I'm the offline phone companion. I can help you make a small plan and keep a private task list on this phone.";
+  return null;
+}
+
+function askForEverydayHelp(prompt) {
+  if (!window.daylightHasAI || !window.daylightHasAI()) {
+    appendMessage("Daylight", "I can answer everyday questions with Google Gemini or Claude. Tap AI settings above and add your own provider key. Your offline task and planning commands still work without one.");
+    return;
+  }
+  const thinking = document.createElement("article");
+  thinking.className = "assistant-message";
+  thinking.dataset.thinking = "true";
+  const mark = document.createElement("span");
+  mark.className = "message-mark";
+  mark.textContent = "d.";
+  const text = document.createElement("p");
+  text.textContent = "Thinking through a practical solution…";
+  thinking.append(mark, text);
+  $("#messages").append(thinking);
+  $("#messages").scrollTop = $("#messages").scrollHeight;
+  window.daylightAskAI(prompt).then((result) => {
+    thinking.remove();
+    appendMessage("Daylight", result.answer);
+    if (result.sources && result.sources.length) {
+      const answer = $("#messages .assistant-message:last-child");
+      const list = document.createElement("ul");
+      list.className = "answer-sources";
+      result.sources.forEach((source) => {
+        let sourceUrl;
+        try {
+          sourceUrl = new URL(source.uri);
+        } catch {
+          return;
+        }
+        if (sourceUrl.protocol !== "https:") return;
+        const item = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = sourceUrl.href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = source.title || sourceUrl.hostname;
+        item.append(link);
+        list.append(item);
+      });
+      answer.append(list);
+    }
+  }).catch((error) => {
+    thinking.remove();
+    appendMessage("Daylight", error.message || "That request didn't go through. Try again.");
+  });
 }
 
 $("#today").textContent = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 renderTasks();
 document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => switchView(button.dataset.view)));
-document.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => appendMessage("Daylight", reply(button.dataset.prompt))));
+document.querySelectorAll("[data-prompt]").forEach((button) => button.addEventListener("click", () => {
+  const result = reply(button.dataset.prompt);
+  if (result) appendMessage("Daylight", result);
+  else askForEverydayHelp(button.dataset.prompt);
+}));
 $("#chat-form").addEventListener("submit", (event) => {
   event.preventDefault();
   const field = $("#message-input");
@@ -191,7 +243,9 @@ $("#chat-form").addEventListener("submit", (event) => {
   field.value = "";
   field.style.height = "auto";
   appendMessage("You", text, true);
-  appendMessage("Daylight", reply(text));
+  const result = reply(text);
+  if (result) appendMessage("Daylight", result);
+  else askForEverydayHelp(text);
 });
 $("#message-input").addEventListener("input", (event) => {
   event.target.style.height = "auto";
