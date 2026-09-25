@@ -1,5 +1,5 @@
-const CACHE_NAME = "daylight-pocket-v2";
-const ASSETS = ["./mobile.html", "./mobile.css", "./mobile.js", "./manifest.webmanifest", "./daylight-icon.svg", "./index.html", "./site.css", "./portable.css"];
+const CACHE_NAME = "daylight-pocket-v6";
+const ASSETS = ["./mobile.html", "./mobile.css", "./mobile-auth.css", "./mobile.js", "./mobile-auth.js", "./manifest.webmanifest", "./daylight-icon.svg", "./index.html", "./site.css", "./portable.css"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -19,5 +19,5 @@ self.addEventListener("fetch", (event) => {
       caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
     }
     return response;
-  }).catch(() => caches.match("./mobile.html"))));
+  }).catch(() => event.request.mode === "navigate" ? caches.match("./mobile.html") : Response.error())));
 });

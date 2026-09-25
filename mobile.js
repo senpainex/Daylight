@@ -1,12 +1,19 @@
 const TASK_KEY = "daylight.pocket.tasks.v1";
 const $ = (selector) => document.querySelector(selector);
 let tasks = loadTasks();
+let taskStorageKey = TASK_KEY;
 let installPrompt = null;
+let accountUser = null;
+let remoteTasksEnabled = false;
+let saveRemoteTasks = null;
+let remoteTaskUnsubscribe = null;
 
-function loadTasks() {
+function loadTasks(key = TASK_KEY) {
   try {
-    const value = JSON.parse(localStorage.getItem(TASK_KEY));
-    return Array.isArray(value) ? value.filter((task) => task && typeof task.text === "string") : [];
+    const value = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(value)
+      ? value.filter((task) => task && typeof task.text === "string").map((task) => ({ ...task, id: task.id || crypto.randomUUID() }))
+      : [];
   } catch {
     return [];
   }
@@ -14,11 +21,60 @@ function loadTasks() {
 
 function saveTasks() {
   try {
-    localStorage.setItem(TASK_KEY, JSON.stringify(tasks));
+    localStorage.setItem(taskStorageKey, JSON.stringify(tasks));
   } catch {
     appendMessage("Daylight", "This browser couldn't save the task list. Check its storage settings.", false);
   }
+  if (accountUser && remoteTasksEnabled && saveRemoteTasks) {
+    saveRemoteTasks(accountUser.uid, tasks).catch(() => {
+      appendMessage("Daylight", "Couldn't sync tasks just now. Your copy is still saved on this phone.", false);
+    });
+  }
 }
+
+window.daylightSetAccount = (user, syncApi) => {
+  if (remoteTaskUnsubscribe) {
+    remoteTaskUnsubscribe();
+    remoteTaskUnsubscribe = null;
+  }
+  if (accountUser && (!user || accountUser.uid !== user.uid)) {
+    accountUser = null;
+    remoteTasksEnabled = false;
+    saveRemoteTasks = null;
+    taskStorageKey = TASK_KEY;
+    tasks = loadTasks();
+    renderTasks(false);
+  }
+  accountUser = user || null;
+  remoteTasksEnabled = Boolean(user && syncApi);
+  saveRemoteTasks = syncApi ? syncApi.saveTasks : null;
+  const footerNote = document.querySelector(".pocket-footer p");
+  if (!user || !syncApi) {
+    footerNote.textContent = "Signed out · Tasks stay in this browser on this phone.";
+    $("#privacy-caption").innerHTML = "<span>⌑</span> This phone only · Works offline";
+    return;
+  }
+  taskStorageKey = `${TASK_KEY}.user.${user.uid}`;
+  tasks = loadTasks(taskStorageKey);
+  renderTasks(false);
+  footerNote.textContent = "Signed in · Syncing your tasks to your account.";
+  $("#privacy-caption").innerHTML = "<span>⌑</span> Account tasks sync · Chat stays on this phone";
+  remoteTaskUnsubscribe = syncApi.listenTasks(user.uid, (remoteTasks) => {
+    tasks = Array.isArray(remoteTasks) ? remoteTasks : [];
+    renderTasks(false);
+    try {
+      localStorage.setItem(taskStorageKey, JSON.stringify(tasks));
+    } catch {
+      appendMessage("Daylight", "Account sync is active, but this browser couldn't update its local copy.", false);
+    }
+  }, (error) => {
+    footerNote.textContent = "Account sync unavailable · This phone's saved copy is still available.";
+    console.error("Daylight task sync failed", error);
+  });
+  syncApi.mergeLocalTasks(user.uid, loadTasks())
+    .then(() => localStorage.removeItem(TASK_KEY))
+    .catch(() => appendMessage("Daylight", "Couldn't merge this phone's saved tasks yet. They remain on this phone.", false));
+};
 
 function appendMessage(author, text, user = false) {
   const row = document.createElement("article");
@@ -38,7 +94,7 @@ function appendMessage(author, text, user = false) {
   $("#messages").scrollTop = $("#messages").scrollHeight;
 }
 
-function renderTasks() {
+function renderTasks(persist = true) {
   const list = $("#task-list");
   list.replaceChildren();
   tasks.forEach((task, index) => {
@@ -72,13 +128,13 @@ function renderTasks() {
   $("#task-count").textContent = openCount;
   $("#empty-tasks").classList.toggle("show", tasks.length === 0);
   $("#clear-done").hidden = !tasks.some((task) => task.done);
-  saveTasks();
+  if (persist) saveTasks();
 }
 
 function addTask(text) {
   const clean = text.trim();
   if (!clean) return false;
-  tasks.unshift({ text: clean, done: false });
+  tasks.unshift({ id: crypto.randomUUID(), text: clean, done: false });
   renderTasks();
   return true;
 }

@@ -6,7 +6,20 @@ Daylight is a free desktop assistant for Windows, macOS, and Linux. The same ZIP
 
 Open `mobile.html` on the hosted site, or visit `/mobile.html` after publishing on GitHub Pages. The phone companion supports offline planning and tasks in its chat-style view. Use the Install button when offered, or your browser's **Add to Home Screen** / **Install app** menu. Installability and offline reopening require HTTPS; GitHub Pages provides HTTPS.
 
-Phone tasks are saved in that browser's local storage on that phone. They do not sync with the desktop app or another phone. The phone companion is intentionally offline-only; Claude API keys are not placed in a public webpage. Use the desktop app for Claude, Ollama, and direct-link downloads.
+Phone tasks work locally while signed out. After signing in, tasks sync to the signed-in user's Firestore document and merge with that phone's locally saved tasks. They do not sync with the desktop app. Claude API keys are never placed in the public webpage. Use the desktop app for Claude, Ollama, and direct-link downloads.
+
+## Enable Google and phone sign-in
+
+Sign-in is optional and requires a Firebase project owned by the site operator. Without this setup, Daylight Pocket continues to work locally and the sign-in controls remain disabled.
+
+1. Create a Firebase project and register a Web app in the [Firebase Console](https://console.firebase.google.com/).
+2. Copy the Web app config into `firebase-config.json` using `firebase-config.example.json` as a template. This browser config is public by design; do not put service-account credentials or private keys in it.
+3. In **Authentication → Sign-in method**, enable **Google** and **Phone**.
+4. In **Authentication → Settings → Authorized domains**, add `senpainex.github.io` and any custom site domain. Configure the SMS region policy to the countries you intend to support. Phone verification uses Firebase reCAPTCHA and may send a billable SMS; standard carrier rates can apply. Firebase processes phone numbers for verification and abuse prevention.
+5. Create the Firestore database, then publish the owner-only rules from `firestore.rules`. These rules limit each signed-in user to `/users/{their UID}`.
+6. Commit the browser config deliberately with `git add -f firebase-config.json`, then commit and push. The config contains public web-app identifiers, not private credentials; never put a service-account key or private key in it. It is excluded from the downloadable desktop ZIP.
+
+Test phone sign-in first with Firebase's fictional test phone numbers. Real SMS delivery, Google OAuth, and Firebase billing require the site owner's configured Firebase project and cannot be tested from this unconfigured repository.
 
 ## Download and run
 
@@ -33,8 +46,4 @@ Tasks are stored in the operating system's standard per-user application data fo
 
 ## Publish this site
 
-1. Create a public repository on GitHub.
-2. From this folder, run `git init -b main`, `git add .`, `git commit -m "Add Daylight download site"`, add your repository as `origin`, and push `main`.
-3. In GitHub repository settings, open **Pages**, select **Deploy from a branch**, choose `main` and `/(root)`, then save.
-
-This folder is not yet connected to a GitHub account or repository, so publishing still needs to be completed from your GitHub account.
+Daylight is published at [senpainex.github.io/Daylight](https://senpainex.github.io/Daylight/). The GitHub repository is `senpainex/Daylight`; GitHub Pages deploys the root of the `main` branch.
