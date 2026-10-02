@@ -1,0 +1,20 @@
+{
+  "name": "daylight-pocket",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daylight Pocket mobile app",
+  "scripts": {
+    "build:mobile": "node scripts/build-mobile.mjs",
+    "cap:sync": "npm run build:mobile && cap sync",
+    "android:debug": "npm run cap:sync && cap open android",
+    "ios:open": "npm run cap:sync && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  }
+}

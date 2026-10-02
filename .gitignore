@@ -3,3 +3,13 @@ __pycache__/
 *.py[cod]
 .DS_Store
 Thumbs.db
+node_modules/
+www/
+android/
+ios/
+*.keystore
+*.jks
+*.mobileprovision
+*.p12
+*.p8
+AuthKey_*.p8

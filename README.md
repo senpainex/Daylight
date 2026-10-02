@@ -6,6 +6,16 @@ Daylight is a free desktop assistant for Windows, macOS, and Linux. The same ZIP
 
 Open `mobile.html` on the hosted site, or visit `/mobile.html` after publishing on GitHub Pages. The phone companion supports offline planning and tasks in its chat-style view. Use the Install button when offered, or your browser's **Add to Home Screen** / **Install app** menu. Installability and offline reopening require HTTPS; GitHub Pages provides HTTPS.
 
+## Native mobile store builds
+
+The repository includes a Capacitor wrapper (`com.senpainex.daylight`) and a GitHub Actions workflow at `.github/workflows/mobile-builds.yml`. On pushes to the mobile app paths, it creates an Android debug APK and release AAB build-check artifact and compiles an unsigned iOS Simulator app. Run a workflow manually from the repository's **Actions** tab to check a build.
+
+These CI artifacts are **not store-ready signed releases**. Android publishing requires a Play Console app listing and Play App Signing/release setup. Apple publishing requires an Apple Developer Program team, App Store Connect record, bundle signing certificate and provisioning, plus screenshots and metadata. This project has not been submitted to either store. Apple review requires meaningful native-app utility beyond a thin website wrapper; review the current guidelines before submission. Sign in with Google/phone also needs native-platform Firebase OAuth configuration and should be tested on real devices. Do not upload signing keys or service-account credentials to Git; configure release signing as protected repository secrets when ready.
+
+Current tool requirements for local builds: Node.js 22+, Android Studio/SDK for Android, and macOS with Xcode 26+ for iOS. This repo's web-based AI/API provider keys are user-entered; do not replace them with a shared secret in the app binary.
+
+The phone app's [privacy policy](privacy.html) is linked inside the app and should also be used in each store listing.
+
 Phone tasks work locally while signed out. After signing in, tasks sync to the signed-in user's Firestore document and merge with that phone's locally saved tasks. They do not sync with the desktop app. In **AI settings**, phone users may select the offline helper, Gemini, Claude Fable 5.1, or Conferbot. Gemini can optionally use Google Search grounding for source-linked answers. To use Gemini or Claude, each person supplies their own API key; Daylight keeps it only in page memory and asks before every prompt is sent to that provider. Keys and chat history are not stored by Daylight. Provider usage may be billed by Google or Anthropic. Use the desktop app for Ollama and direct-link downloads.
 
 For Gemini, create a personal key in [Google AI Studio](https://aistudio.google.com/apikey) and restrict it to the Gemini API. Google may offer a free usage quota depending on model, account, and region; it is not a shared or guaranteed free key. Check current terms and set quota/billing limits. Google warns that API keys used in client apps can be inspected; use only your own restricted key. For Claude, create a personal key in the [Anthropic Console](https://platform.claude.com/settings/keys). Never put a shared provider key in this public repository.

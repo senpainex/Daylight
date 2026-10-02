@@ -1,0 +1,13 @@
+{
+  "appId": "com.senpainex.daylight",
+  "appName": "Daylight Pocket",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "automatic"
+  },
+  "server": {
+    "iosScheme": "capacitor",
+    "androidScheme": "https"
+  }
+}
