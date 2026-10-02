@@ -5,6 +5,8 @@ let apiKeyForThisPage = "";
 let aiConversation = [];
 let googleSearchGrounding = false;
 let requestInProgress = false;
+let conferbotBotId = "";
+let conferbotLoaded = false;
 
 function aiStatus(message, isError) {
   const status = $ai("#ai-status");
@@ -13,13 +15,14 @@ function aiStatus(message, isError) {
 }
 
 function configureProviderControls() {
-  const wantsAI = selectedProvider !== "offline";
-  $ai("#ai-key-form").hidden = !wantsAI;
+  const needsPersonalKey = selectedProvider === "gemini" || selectedProvider === "claude";
+  $ai("#ai-key-form").hidden = !needsPersonalKey;
+  $ai("#conferbot-form").hidden = selectedProvider !== "conferbot";
   $ai("#grounding-option").hidden = selectedProvider !== "gemini";
   const settingsButton = $ai("#ai-settings-button");
   settingsButton.textContent = selectedProvider === "offline"
     ? "AI · Offline"
-    : `AI · ${selectedProvider === "gemini" ? "Gemini" : "Claude"}`;
+    : `AI · ${selectedProvider === "gemini" ? "Gemini" : selectedProvider === "claude" ? "Claude" : "Conferbot"}`;
   const keyLink = $ai("#provider-key-link");
   if (selectedProvider === "claude") {
     keyLink.href = "https://platform.claude.com/settings/keys";
@@ -29,6 +32,10 @@ function configureProviderControls() {
     keyLink.href = "https://aistudio.google.com/apikey";
     keyLink.textContent = "Get a Gemini API key ↗";
     aiStatus(apiKeyForThisPage ? "Gemini is ready for this page session." : "Your Gemini API key is required. Restrict it to Gemini API and set usage limits.");
+  } else if (selectedProvider === "conferbot") {
+    keyLink.href = "https://app.conferbot.com/login";
+    keyLink.textContent = "Open Conferbot dashboard ↗";
+    aiStatus(conferbotLoaded ? "Conferbot widget is connected." : "Enter your bot ID from the Conferbot dashboard.");
   } else {
     aiStatus("Offline answers need no account or key.");
   }
@@ -36,12 +43,61 @@ function configureProviderControls() {
   if (caption) {
     const detail = selectedProvider === "offline"
       ? "This phone only · Works offline"
-      : `Prompts sent to ${selectedProvider === "gemini" ? "Google Gemini" : "Claude"} after confirmation`;
+      : selectedProvider === "conferbot"
+        ? "Chat messages shared with Conferbot"
+        : `Prompts sent to ${selectedProvider === "gemini" ? "Google Gemini" : "Claude"} after confirmation`;
     caption.replaceChildren();
     const symbol = document.createElement("span");
     symbol.textContent = "⌑";
     caption.append(symbol, document.createTextNode(` ${detail}`));
   }
+  if (window.daylightSetProviderState) {
+    window.daylightSetProviderState(selectedProvider, selectedProvider === "conferbot" && conferbotLoaded);
+  }
+}
+
+function loadConferbotWidget(botId) {
+  if (conferbotLoaded) {
+    return botId === conferbotBotId
+      ? Promise.resolve()
+      : Promise.reject(new Error("A Conferbot is already loaded. Reload Daylight before connecting a different bot."));
+  }
+  if (!/^[A-Za-z0-9_-]{3,160}$/.test(botId)) {
+    return Promise.reject(new Error("That bot ID doesn't look valid. Copy the ID from your Conferbot widget setup."));
+  }
+  return new Promise((resolve, reject) => {
+    const scriptId = "conferbot-js";
+    const existing = document.getElementById(scriptId);
+    if (existing) {
+      reject(new Error("Conferbot's script is already loading. Wait a moment and try again."));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.async = true;
+    script.charset = "UTF-8";
+    script.src = "https://cdn.conferbot.com/dist/v1/widget.min.js";
+    script.onload = () => {
+      if (typeof window.ConferbotWidget !== "function") {
+        script.remove();
+        reject(new Error("Conferbot loaded but its widget API was unavailable."));
+        return;
+      }
+      try {
+        window.ConferbotWidget(botId);
+        conferbotLoaded = true;
+        resolve();
+      } catch (error) {
+        script.remove();
+        reject(error);
+      }
+    };
+    script.onerror = () => {
+      script.remove();
+      reject(new Error("Couldn't load Conferbot. Check your connection and bot ID."));
+    };
+    document.head.append(script);
+  });
 }
 
 function formatProviderError(error, provider) {
@@ -121,11 +177,44 @@ async function requestClaude(prompt, key) {
 
 $ai("#ai-settings-button").addEventListener("click", () => $ai("#ai-dialog").showModal());
 $ai("#ai-provider").addEventListener("change", (event) => {
+  if (conferbotLoaded && event.target.value !== "conferbot") {
+    window.alert("Conferbot's script cannot be unloaded after connection. Reload Daylight to disconnect it before choosing another provider.");
+    event.target.value = "conferbot";
+    return;
+  }
   selectedProvider = event.target.value;
   apiKeyForThisPage = "";
   aiConversation = [];
   $ai("#ai-key").value = "";
   configureProviderControls();
+});
+$ai("#conferbot-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const botId = $ai("#conferbot-bot-id").value.trim();
+  if (!botId) {
+    aiStatus("Paste your Conferbot bot ID first.", true);
+    return;
+  }
+  if (!$ai("#conferbot-consent").checked) {
+    aiStatus("Confirm that messages will be sent to your Conferbot bot.", true);
+    return;
+  }
+  const button = $ai("#conferbot-form button[type=submit]");
+  const providerSelect = $ai("#ai-provider");
+  button.disabled = true;
+  providerSelect.disabled = true;
+  aiStatus("Loading Conferbot widget…");
+  try {
+    await loadConferbotWidget(botId);
+    conferbotBotId = botId;
+    $ai("#ai-dialog").close();
+    configureProviderControls();
+  } catch (error) {
+    aiStatus(error.message || "Couldn't connect Conferbot.", true);
+  } finally {
+    button.disabled = false;
+    providerSelect.disabled = false;
+  }
 });
 $ai("#ai-grounding").addEventListener("change", (event) => {
   googleSearchGrounding = event.target.checked;
@@ -157,9 +246,15 @@ function clearProviderSession() {
 window.addEventListener("pagehide", clearProviderSession);
 window.addEventListener("beforeunload", clearProviderSession);
 
-window.daylightHasAI = () => selectedProvider !== "offline" && Boolean(apiKeyForThisPage);
+window.daylightHasAI = () => selectedProvider === "conferbot"
+  ? conferbotLoaded && Boolean(conferbotBotId)
+  : selectedProvider !== "offline" && Boolean(apiKeyForThisPage);
+window.daylightProvider = () => selectedProvider;
 window.daylightOpenAISettings = () => $ai("#ai-dialog").showModal();
 window.daylightAskAI = async (prompt) => {
+  if (selectedProvider === "conferbot" && window.daylightHasAI()) {
+    return { answer: "Conferbot is connected. Continue this conversation in the Conferbot chat widget on your screen.", sources: [] };
+  }
   if (requestInProgress) throw new Error("Please wait for the current answer to finish.");
   if (!window.daylightHasAI()) throw new Error("Choose an AI provider and enter your own API key in AI settings.");
   if (!window.confirm(`Send this question to ${selectedProvider === "gemini" ? "Google Gemini" : "Claude"}? The provider will receive your prompt, and usage may be billed to you.`)) {

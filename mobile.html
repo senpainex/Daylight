@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="mobile.css">
   <link rel="stylesheet" href="mobile-auth.css">
   <link rel="stylesheet" href="mobile-ai.css">
+  <link rel="stylesheet" href="conferbot.css">
 </head>
 <body>
   <div class="pocket-app">
@@ -46,6 +47,10 @@
             <button type="button" data-prompt="tasks">Show my tasks</button>
           </div>
         </div>
+        <aside id="conferbot-chat-notice" class="conferbot-chat-notice" hidden aria-live="polite">
+          <span class="conferbot-status-dot" aria-hidden="true"></span>
+          <p><strong>Conferbot is connected.</strong><br>Tap the Conferbot chat bubble on this screen to start chatting.</p>
+        </aside>
         <form class="composer" id="chat-form">
           <label class="visually-hidden" for="message-input">Message Daylight</label>
           <textarea id="message-input" rows="1" maxlength="1200" placeholder="Try “plan” or “task buy milk”" enterkeyhint="send"></textarea>
@@ -109,6 +114,7 @@
         <option value="offline">Offline helper · free</option>
         <option value="gemini">Google Gemini</option>
         <option value="claude">Claude Fable 5.1</option>
+        <option value="conferbot">Conferbot chat</option>
       </select>
     </div>
     <form id="ai-key-form" class="ai-key-form" hidden>
@@ -119,6 +125,14 @@
       <label class="ai-consent"><input id="ai-consent" type="checkbox"> I understand provider usage may be billed to me.</label>
       <button class="auth-primary" type="submit">Use this AI for this session</button>
       <a id="provider-key-link" class="auth-setup-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Get a Gemini API key ↗</a>
+    </form>
+    <form id="conferbot-form" class="ai-key-form" hidden>
+      <label class="ai-label" for="conferbot-bot-id">YOUR CONFERBOT BOT ID</label>
+      <input id="conferbot-bot-id" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Paste the bot ID from your Conferbot dashboard">
+      <p class="auth-disclosure">Create and publish a website widget bot in Conferbot, then copy its bot ID. Conferbot's script runs inside this page and may access page content and browser storage, including local Daylight tasks. Use only if you trust Conferbot with this browser data.</p>
+      <label class="ai-consent"><input id="conferbot-consent" type="checkbox"> I trust Conferbot with page data and agree to load its widget.</label>
+      <button class="auth-primary" type="submit">Connect Conferbot</button>
+      <a class="auth-setup-link" href="https://app.conferbot.com/signup" target="_blank" rel="noopener noreferrer">Open Conferbot ↗</a>
     </form>
     <p id="ai-status" class="auth-status" role="status" aria-live="polite">Offline answers need no account or key.</p>
   </dialog>

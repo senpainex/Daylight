@@ -1,5 +1,5 @@
-const CACHE_NAME = "daylight-pocket-v8";
-const ASSETS = ["./mobile.html", "./mobile.css", "./mobile-auth.css", "./mobile-ai.css", "./mobile.js", "./mobile-ai.js", "./mobile-auth.js", "./manifest.webmanifest", "./daylight-icon.svg", "./index.html", "./site.css", "./portable.css"];
+const CACHE_NAME = "daylight-pocket-v10";
+const ASSETS = ["./mobile.html", "./mobile.css", "./mobile-auth.css", "./mobile-ai.css", "./conferbot.css", "./mobile.js", "./mobile-ai.js", "./mobile-auth.js", "./manifest.webmanifest", "./daylight-icon.svg", "./index.html", "./site.css", "./portable.css"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));

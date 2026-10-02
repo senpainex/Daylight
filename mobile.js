@@ -179,9 +179,20 @@ function reply(text) {
   return null;
 }
 
+window.daylightSetProviderState = (provider, connected) => {
+  const usingConferbot = provider === "conferbot" && connected;
+  $("#chat-form").hidden = usingConferbot;
+  $("#conferbot-chat-notice").hidden = !usingConferbot;
+};
+
 function askForEverydayHelp(prompt) {
   if (!window.daylightHasAI || !window.daylightHasAI()) {
-    appendMessage("Daylight", "I can answer everyday questions with Google Gemini or Claude. Tap AI settings above and add your own provider key. Your offline task and planning commands still work without one.");
+    const provider = window.daylightProvider ? window.daylightProvider() : "offline";
+    if (provider === "conferbot") {
+      appendMessage("Daylight", "Connect your Conferbot by entering the bot ID from its website widget setup in AI settings. Offline tasks and planning still work without it.");
+    } else {
+      appendMessage("Daylight", "I can answer everyday questions with Google Gemini or Claude. Tap AI settings above and add your own provider key. Your offline task and planning commands still work without one.");
+    }
     return;
   }
   const thinking = document.createElement("article");
